@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw vs Hermes 架构对比</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #0f172a;
+            font-family: 'Microsoft YaHei', system-ui, sans-serif;
+            color: #e2e8f0;
+        }
+        h1 {
+            text-align: center;
+            color: #60a5fa;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+        #canvas-container {
+            display: flex;
+            justify-content: center;
+            background: #1e2937;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .legend-color {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 24px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <h1>OpenClaw vs Hermes 架构对比</h1>
+    <p class="subtitle">用户消息处理流程 · 手绘风格 Canvas 可视化</p>
+    
+    <div id="canvas-container"></div>
+    
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background:#f59e0b;"></div>
+            <span>🟠 OpenClaw（传统阻塞式）</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background:#22c55e;"></div>
+            <span>🟢 Hermes（现代异步缓存式）</span>
+        </div>
+    </div>
+
+    <center>
+        <button onclick="saveImage()">💾 保存为 PNG 图片</button>
+    </center>
+
+    <script>
+        let canvas;
+        
+        function setup() {
+            canvas = createCanvas(1280, 720);
+            canvas.parent('canvas-container');
+            textFont('Microsoft YaHei');
+            noLoop(); // 静态图，性能更好
+        }
+        
+        function draw() {
+            background(15, 23, 42);
+            
+            // 标题背景
+            fill(30, 41, 59);
+            noStroke();
+            rect(40, 30, width - 80, 80, 15);
+            
+            fill(224, 242, 255);
+            textSize(28);
+            textAlign(CENTER);
+            text("用户消息处理流程对比", width/2, 75);
+            
+            // 分割线
+            stroke(51, 65, 85);
+            strokeWeight(3);
+            line(width/2, 140, width/2, height - 80);
+            
+            // ================== OpenClaw 左侧 ==================
+            drawColumn(80, 160, true);
+            
+            // ================== Hermes 右侧 ==================
+            drawColumn(width/2 + 40, 160, false);
+            
+            // 底部说明
+            fill(148, 163, 184);
+            textSize(14);
+            textAlign(CENTER);
+            text("OpenClaw：每次请求都阻塞等待 Honcho", width/4, height - 40);
+            text("Hermes：异步预取 + 缓存，接近零延迟", width*0.75, height - 40);
+        }
+        
+        function drawColumn(x, y, isOpenClaw) {
+            let color = isOpenClaw ? '#f59e0b' : '#22c55e';
+            let title = isOpenClaw ? "🟠 OpenClaw\n(旧架构 - Hook插件)" : "🟢 Hermes\n(新架构 - 深度内置)";
+            
+            // 标题框
+            fill(15, 23, 42);
+            stroke(color);
+            strokeWeight(4);
+            rect(x, y, 460, 65, 12);
+            
+            fill(241, 245, 255);
+            noStroke();
+            textSize(18);
+            textAlign(CENTER);
+            text(title, x + 230, y + 48);
+            
+            let steps = isOpenClaw ? [
+                "1. 用户输入消息",
+                "2. before_prompt_build Hook",
+                "3. 同步阻塞调用 Honcho",
+                "4. 等待网络响应 (200-800ms)",
+                "5. 组装 Prompt",
+                "6. 调用 LLM",
+                "7. agent_end Hook 保存"
+            ] : [
+                "1. 用户输入消息",
+                "2. 从缓存读取 (_honcho_prefetch)",
+                "3. 几乎零延迟",
+                "4. 使用已缓存的 System Prompt",
+                "5. 调用 LLM",
+                "6. 异步后台预取",
+                "7. 下次直接读缓存"
+            ];
+            
+            let boxColor = isOpenClaw ? '#78350f' : '#14532d';
+            let textColor = isOpenClaw ? '#fed7aa' : '#86efac';
+            
+            for (let i = 0; i < steps.length; i++) {
+                let py = y + 100 + i * 72;
+                
+                // 步骤框
+                fill(boxColor);
+                stroke(color);
+                strokeWeight(2.5);
+                rect(x + 30, py, 400, 58, 10);
+                
+                // 文字
+                fill(textColor);
+                noStroke();
+                textSize(15);
+                textAlign(LEFT);
+                text(steps[i], x + 55, py + 38);
+                
+                // 连接箭头
+                if (i < steps.length - 1) {
+                    stroke(color);
+                    strokeWeight(3);
+                    line(x + 230, py + 62, x + 230, py + 88);
+                    fill(color);
+                    noStroke();
+                    triangle(x + 223, py + 85, x + 230, py + 98, x + 237, py + 85);
+                }
+            }
+        }
+        
+        // 保存图片功能
+        function saveImage() {
+            saveCanvas(canvas, 'OpenClaw_vs_Hermes_架构对比', 'png');
+            let btn = document.querySelector('button');
+            let originalText = btn.textContent;
+            btn.textContent = '✅ 已保存！';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 2000);
+        }
+        
+        // 点击画布也能保存
+        function mousePressed() {
+            if (mouseY > 100 && mouseY < height - 100) {
+                saveImage();
+            }
+        }
+        
+        console.log("%cOpenClaw vs Hermes 架构对比 Canvas 已生成\n双击画布或点击下方按钮保存 PNG 图片", "color:#60a5fa; font-size:14px");
+    </script>
+</body>
+</html>

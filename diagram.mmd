@@ -1,0 +1,32 @@
+flowchart TD
+    subgraph OpenClaw ["🟠 OpenClaw 架构 (Hook 插件式)"]
+        A1[用户输入消息] 
+        --> B1[before_prompt_build Hook]
+        --> C1[阻塞式调用 Honcho\nsession.context()]
+        --> D1[每次都等待网络请求\n200-800ms 延迟]
+        --> E1[组装 System Prompt]
+        --> F1[调用 LLM]
+        --> G1[agent_end Hook]
+        --> H1[保存消息 + Metadata]
+        style C1 fill:#ffe6cc,stroke:#d97706
+    end
+
+    subgraph Hermes ["🟢 Hermes 架构 (深度内置式)"]
+        A2[用户输入消息]
+        --> B2[_honcho_prefetch\n从缓存读取]
+        --> C2[几乎零延迟\n无需等待网络]
+        --> D2[使用已缓存的 System Prompt]
+        --> E2[调用 LLM]
+        --> F2[LLM 返回后异步触发]
+        --> G2[Daemon Thread 预取\n下一次直接用缓存]
+        style C2 fill:#d1fae5,stroke:#10b981
+    end
+
+    Start[用户消息] --> OpenClaw
+    Start --> Hermes
+
+    classDef oc fill:#fff7ed,stroke:#c2410c,stroke-width:2px
+    classDef hermes fill:#f0fdf4,stroke:#166534,stroke-width:2px
+    class OpenClaw oc
+    class Hermes hermes
+    classDef title fill:none,stroke:none
